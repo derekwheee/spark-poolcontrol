@@ -1,0 +1,21 @@
+{
+  "name": "spark-poolcontrol",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/frxnz/spark-poolcontrol.git"
+  },
+  "author": "Derek Wheelden",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/frxnz/spark-poolcontrol/issues"
+  },
+  "homepage": "https://github.com/frxnz/spark-poolcontrol",
+  "dependencies": {
+    "request": "^2.55.0",
+    "temporal": "^0.4.0"
+  }
+}
