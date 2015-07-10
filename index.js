@@ -1,9 +1,68 @@
-var request  = require('request'),
-    temporal = require("temporal"),
-    repl     = require("repl"),
-    params   = {
-        access_token : process.env.SPARK_TOKEN
-    };
+var request  = require('request');
+var temporal = require('temporal');
+var repl = require('repl');
+var spark = require('spark');
+var chalk = require('chalk');
+var events = require('events');
+var emitter = new events.EventEmitter();
+
+var modes = [
+    'Treasure Island / Slow color change',
+    'Moonlight White / Fixed White',
+    'SAVI Blue / Fixed Blue',
+    'Sargasso Sea / Fixed Green',
+    'Blue Lagoon / Fixed Light Blue',
+    'Passion Pink / Fixed Magenta',
+    'Caribbean Hues / Blue and Green Slow Color Change',
+    'Copacabana / Magenta, Yellow and Orange Slow Color Change',
+    'Dance party / Multi Color Strobe Effect'
+];
+
+var state = {
+    device: null,
+    synced: true,
+    changing: false,
+    mode: null
+};
+
+spark.login({accessToken: '86d2ecbb912ec707949d7effa0eafad97f16c637'}, function () {
+
+    console.log(chalk.cyan('Successfully logged in.'));
+
+});
+
+spark.on('login', function(err, body) {
+    if (err) {
+        console.log(chalk.red('Couldn\'t log in.'));
+    } else {
+        console.log(chalk.cyan('Successfully logged in.'));
+    }
+});
+
+spark.getDevice('54ff6f066678574932290167', function(err, device) {
+    console.log('Device ready: ' + chalk.green(device.name));
+    state.device = device;
+
+    if (!state.synced) {
+        device.callFunction('sync', null, function(err, data) {
+            // This is going to time out so don't even worry about it
+        });
+
+        device.subscribe('synchronizing', function(data) {
+            console.log(chalk.yellow('Syncing...'));
+        });
+
+        device.subscribe('synchronized', function(data) {
+            console.log(chalk.green('Done syncing.'));
+            state.synced = true;
+            state.mode = 0;
+            emitter.emit('ready');
+        });
+    } else {
+        state.mode = 0;
+        emitter.emit('ready');
+    }
+});
 
 /// SYNCHRONIZE
 //  Turn lights off
@@ -38,35 +97,74 @@ var request  = require('request'),
 //  8. Copacabana / Magenta, Yellow and Orange Slow Color Change
 //  9. Dance party / Multi Color Strobe Effect
 
-function sync () {
-    request.post(
-        'https://api.spark.io/v1/devices/' + process.env.SPARK_DEVICE_ID + '/sync',
-        {
-            timeout: 60000,
-            form: {
-                access_token : process.env.SPARK_TOKEN
-            }
-        },
-        handleResponse.bind(this)
-    );
+emitter.on('ready', function () {
+
+    if (!state.device || !state.synced) {
+        console.log(chalk.red('Hm, something went wrong.'));
+        return;
+    }
+
+    console.log(chalk.magenta('Ready to change some colors!'));
+
+    console.log(chalk.cyan('Color mode:'), modes[state.mode]);
+
+    state.device.subscribe('change-start', function(data) {
+        console.log(chalk.yellow('Changing...'));
+        state.changing = true;
+    });
+
+    state.device.subscribe('changed', function(data) {
+        console.log(chalk.cyan('Moved 1 step.'));
+        if (state.mode === modes.length - 1) {
+            state.mode = 0;
+        } else {
+            state.mode++;
+        }
+        console.log(chalk.cyan('Color mode:'), modes[state.mode]);
+    });
+
+    state.device.subscribe('change-end', function(data) {
+        console.log(chalk.green('Done changing.'));
+        state.changing = false;
+    });
+
+    next();
+
+});
+
+function next () {
+
+    if (state.changing) {
+        console.log(chalk.red('Device is busy. Try again later.'));
+        return;
+    }
+
+    state.device.callFunction('next', null, function(err, data) {
+        // This is going to time out so don't even worry about it
+    });
+
 }
 
-function handleResponse (err, res, body) {
-    if (err) {
-        console.log(err);
-    } else {
-        console.log(body);
+function moveSteps(steps) {
+    if (state.changing) {
+        console.log(chalk.red('Device is busy. Try again later.'));
+        return;
     }
+
+    state.device.callFunction('moveSteps', steps.toString(), null, function(err, data) {
+        // This is going to time out so don't even worry about it
+    });
 }
 
 var replDefaults = {
-    prompt: ">> ",
+    prompt: 'what? ',
     useGlobal: false
 };
 
 // Initialize the REPL session with the default
 // repl settings.
-// Assign the returned repl instance to "cmd"
+// Assign the returned repl instance to 'cmd'
 var cmd = repl.start(replDefaults);
 
-cmd.context.sync = sync;
+cmd.context.next = next;
+cmd.context.moveSteps = moveSteps;

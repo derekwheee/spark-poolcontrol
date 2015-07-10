@@ -17,5 +17,9 @@
   "dependencies": {
     "request": "^2.55.0",
     "temporal": "^0.4.0"
+  },
+  "devDependencies": {
+    "chalk": "^1.1.0",
+    "spark": "^0.5.9"
   }
 }
